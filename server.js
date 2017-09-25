@@ -17,22 +17,22 @@ let map = [
     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1],
     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,1,0,1,1,1,1,1,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,1,0,0,0,0,0,1,1,0,0,0,0,0,0,0,1],
-    [1,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,0,0,0,0,1,1,1,1,1,1,0,0,0,0,1,1,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 ];
 const t = 20;
 
 io.on('connection', function(socket) {
     console.log("made socket connection", socket.id);
-    players.push({id: socket.id, x: 150, y: 150, vx: 0, vy: 0, ground: false, delay: 0});
+    players.push({id: socket.id, hp: 100, x: 150, y: 200, vx: 0, vy: 0, ground: false, delay: 0});
     playersData.push({id: socket.id, down: []});
 
     socket.emit('sendMap', {map: map});
@@ -86,7 +86,13 @@ function updatePlayer(playerData) {
     if (down === undefined)
         down = [];
 
-    if (player !== undefined) {
+    if (player.hp <= 0) {
+        player.x = 150;
+        player.y = 30;
+        player.hp = 100;
+    }
+
+    else if (player !== undefined) {
 
     if (down.indexOf('a') !== -1) {
         if (player.vx > -5)
@@ -144,10 +150,10 @@ function updatePlayer(playerData) {
 
     if (mouse !== undefined) {
         if (mouse.pressed && player.delay <= 0) {
-            player.delay = 10;
+            player.delay = 8;
             // console.log("shoot");
-            let angle = Math.atan2(player.mouse.y - player.y+10, player.mouse.x - player.x+10);
-            bullets.push({id: player.id, x: player.x+10, y: player.y+10, vx: Math.cos(angle)*10, vy: Math.sin(angle)*10});
+            let angle = Math.atan2(player.mouse.y - player.y-10, player.mouse.x - player.x-10);
+            bullets.push({id: player.id, x: player.x+10, y: player.y+10, vx: Math.cos(angle)*15, vy: Math.sin(angle)*15});
         }
         player.delay--;
     }
@@ -190,6 +196,14 @@ function collBullet(x, y) {
         return false;
 }
 
+function aabbBullet(player, bullet) {
+    if (bullet.x > player.x && bullet.x < player.x+t &&
+        bullet.y > player.y && bullet.y < player.y+t)
+        return true;
+    else
+        return false;
+}
+
 setInterval( function() {
     players.forEach(player => {
         let pd = playersData.filter(pd => pd.id == player.id)[0];
@@ -201,11 +215,19 @@ setInterval( function() {
     bullets.forEach(bullet => {
         bullet.x += bullet.vx;
         bullet.y += bullet.vy;
+        players.forEach(player => {
+            if (aabbBullet(player,bullet)) {
+                if (player.id !== bullet.id) {
+                    player.hp -= 20;
+                    bullets.splice(bullets.indexOf(bullet),1);
+                }    
+            }
+        });
         // console.log(bullet);
         if (collBullet(bullet.x, bullet.y))
             bullets.splice(bullets.indexOf(bullet),1);
             
-    })
+    });
 
     io.sockets.emit('emitPlayerData', players);
     io.sockets.emit('emitBulletData', bullets);

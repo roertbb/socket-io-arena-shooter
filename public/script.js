@@ -69,10 +69,13 @@ function draw() {
             }
         }
     }
+    let hp;
 
     players.forEach(player => {
-        if (player.id == socket.id)
+        if (player.id == socket.id) {
             ctx.fillStyle = "#fff";
+            hp = player.hp;
+        }
         else
             ctx.fillStyle = "#4f3";
 
@@ -80,8 +83,8 @@ function draw() {
 
         if (player.mouse !== undefined) {
             
-        let dy = player.mouse.y - player.y+10,
-            dx = player.mouse.x - player.x+10,
+        let dy = player.mouse.y - player.y-10,
+            dx = player.mouse.x - player.x-10,
             angle = Math.atan2(dy, dx);
             
         ctx.strokeStyle = "#000";
@@ -103,7 +106,9 @@ function draw() {
 
     ctx.font = "14px arial";
     ctx.fillStyle = "#fff";
-    ctx.fillText(`${tick} x:${Key.mouse.x} y:${Key.mouse.y}`, 5, 15);
+    ctx.fillText(`${tick}`, 5, 15);
+    ctx.fillText(`x:${Key.mouse.x} y:${Key.mouse.y}`, 5, 30);
+    ctx.fillText(`HP: ${hp}`, 5, 45);
 
     ctx.lineWidth = 3;
     ctx.strokeStyle = "#fff";
