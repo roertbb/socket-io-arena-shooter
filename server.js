@@ -10,6 +10,7 @@ console.log("Starting server...");
 
 let players = [];
 let playersData = [];
+let bullets = [];
 
 let map = [
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -31,7 +32,7 @@ const t = 20;
 
 io.on('connection', function(socket) {
     console.log("made socket connection", socket.id);
-    players.push({id: socket.id, x: 150, y: 150, vx: 0, vy: 0, ground: false});
+    players.push({id: socket.id, x: 150, y: 150, vx: 0, vy: 0, ground: false, delay: 0});
     playersData.push({id: socket.id, down: []});
 
     socket.emit('sendMap', {map: map});
@@ -84,8 +85,6 @@ function updatePlayer(playerData) {
     
     if (down === undefined)
         down = [];
-
-    // console.log(down);
 
     if (player !== undefined) {
 
@@ -143,6 +142,17 @@ function updatePlayer(playerData) {
         player.vy = 0;
     }
 
+    if (mouse !== undefined) {
+        if (mouse.pressed && player.delay <= 0) {
+            player.delay = 10;
+            // console.log("shoot");
+            let angle = Math.atan2(player.mouse.y - player.y+10, player.mouse.x - player.x+10);
+            bullets.push({id: player.id, x: player.x+10, y: player.y+10, vx: Math.cos(angle)*10, vy: Math.sin(angle)*10});
+        }
+        player.delay--;
+    }
+
+
     players.forEach(p => {
         if (p.id == player.id) {
             p.x = player.x;
@@ -153,7 +163,6 @@ function updatePlayer(playerData) {
             p.mouse = mouse;
         }
     });
-
     }
 }
 
@@ -174,6 +183,13 @@ function collTile(x, y) {
         return false;
 }
 
+function collBullet(x, y) {
+    if (map[Math.floor(y/t)][Math.floor(x/t)] !== 0)
+        return true;
+    else
+        return false;
+}
+
 setInterval( function() {
     players.forEach(player => {
         let pd = playersData.filter(pd => pd.id == player.id)[0];
@@ -182,7 +198,17 @@ setInterval( function() {
         updatePlayer(pd);
     });
 
+    bullets.forEach(bullet => {
+        bullet.x += bullet.vx;
+        bullet.y += bullet.vy;
+        // console.log(bullet);
+        if (collBullet(bullet.x, bullet.y))
+            bullets.splice(bullets.indexOf(bullet),1);
+            
+    })
+
     io.sockets.emit('emitPlayerData', players);
+    io.sockets.emit('emitBulletData', bullets);
 }, 30);
 
 let tick = 0;

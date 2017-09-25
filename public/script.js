@@ -14,11 +14,13 @@ let Key = {
 	isDown: function (keyCode) { return this.pressed[this.keys[keyCode]]; },
 	onKeyDown: function (event) { this.pressed[event.keyCode] = true; },
     onKeyUp: function (event) { delete this.pressed[event.keyCode]; },
-    mouse: {x: 0, y: 0}
+    mouse: {x: 0, y: 0, pressed: false, delay: 0}
 };
 window.addEventListener('keyup', (event) => { Key.onKeyUp(event); }, false);
 window.addEventListener('keydown', (event) => { Key.onKeyDown(event); }, false);
 window.addEventListener('mousemove', (event) => { getMouseCords(event); }, false);
+window.addEventListener('mousedown', (event) => { Key.mouse.pressed = true; });
+window.addEventListener('mouseup', (event) => { Key.mouse.pressed = false; });
 
 function getMouseCords(event) {
     let rect = canvas.getBoundingClientRect();
@@ -27,6 +29,7 @@ function getMouseCords(event) {
 }
 
 let players = [];
+let bullets = [];
 let map = undefined;
 let tick = 0;
 
@@ -34,7 +37,7 @@ function move() {
     let player = {
         id: socket.id,
         down: [],
-        mouse: {x: Key.mouse.x, y: Key.mouse.y}
+        mouse: {x: Key.mouse.x, y: Key.mouse.y, pressed: Key.mouse.pressed, delay: Key.mouse.delay}
     };
 
     if (Key.isDown('w'))
@@ -91,6 +94,13 @@ function draw() {
         }
     });
 
+    ctx.fillStyle = "#fff";
+    bullets.forEach(bullet => {
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI*2);
+        ctx.fill();
+    });
+
     ctx.font = "14px arial";
     ctx.fillStyle = "#fff";
     ctx.fillText(`${tick} x:${Key.mouse.x} y:${Key.mouse.y}`, 5, 15);
@@ -104,6 +114,10 @@ function draw() {
 
 socket.on('emitPlayerData', data => {
     players = data;
+});
+
+socket.on('emitBulletData', data => {
+    bullets = data;
 });
 
 socket.on('sendMap', data => {
