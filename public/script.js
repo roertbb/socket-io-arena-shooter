@@ -62,6 +62,7 @@ const colors = {
 };
 
 function draw() {
+    let dead = false;
     
 
     ctx.clearRect(0,0,w,h);
@@ -128,12 +129,22 @@ function draw() {
     ctx.arc(Key.mouse.x,Key.mouse.y,5,0,Math.PI*2);
     ctx.stroke();
 
-    if (!loggedIn) {
+    let playersIDs = players.map(player => player.id);
+
+    if (playersIDs.indexOf(socket.id) === -1) {
         ctx.fillStyle = "rgba(53,53,53,0.6)";
         ctx.fillRect(0,0,w,h);
 
-        //call function drawing scoreboard
-            //draw names of plazers
+        ctx.fillStyle = "#fff";
+        if (loggedIn) {
+            // draw.proper.fill
+            ctx.fillText("You died!",w/2-40,h/2);
+            ctx.fillText(`respawning in 5 seconds`,w/2-80,h/2+20);
+        }
+        else {
+            // must have died
+            ctx.fillText("please customize and hit play button!",w/2-120,h/2);
+        }
     }
 }
 

@@ -94,6 +94,16 @@ function updatePlayer(playerData) {
 
     else if (player !== undefined) {
 
+    if (player.tick == tick) {
+        let spawningPoint = spawningPoints[Math.floor(Math.random()*spawningPoints.length)];
+        player.hp = 100;
+        player.x = spawningPoint.x;
+        player.y = spawningPoint.y;
+        delete player.tick;
+    }
+
+    if (player.hp > 0) {
+    
     if (down.indexOf('a') !== -1) {
         if (player.vx > -5)
             player.vx -= 0.5;
@@ -148,10 +158,9 @@ function updatePlayer(playerData) {
         player.vy = 0;
     }
 
-    if (mouse !== undefined) {
+    if (mouse !== undefined && player.tick === undefined) {
         if (mouse.pressed && player.delay <= 0) {
             player.delay = 8;
-            // console.log("shoot");
             let angle = Math.atan2(player.mouse.y - player.y-10, player.mouse.x - player.x-10);
             bullets.push({id: player.id, x: player.x+10, y: player.y+10, vx: Math.cos(angle)*15, vy: Math.sin(angle)*15});
         }
@@ -169,6 +178,8 @@ function updatePlayer(playerData) {
             p.mouse = mouse;
         }
     });
+    }
+
     }
 }
 
@@ -228,18 +239,17 @@ setInterval( function() {
                     bullets.splice(bullets.indexOf(bullet),1);
                 }    
             }
-            if (player.hp <= 0) {
-                let spawningPoint = spawningPoints[Math.floor(Math.random()*spawningPoints.length)];
-                player.x = spawningPoint.x;
-                player.y = spawningPoint.y;
-                player.hp = 100;
+            if (player.hp <= 0 && player.tick === undefined) {
+                player.tick = tick+5;
+                player.x = -20;
+                player.y = -20;
             }
         });
         if (collBullet(bullet.x, bullet.y))
             bullets.splice(bullets.indexOf(bullet),1); 
     });
 
-    io.sockets.emit('emitPlayerData', players);
+    io.sockets.emit('emitPlayerData', players.filter(player => player.tick == undefined));
     io.sockets.emit('emitBulletData', bullets);
 }, 30);
 
