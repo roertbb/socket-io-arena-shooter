@@ -1,7 +1,6 @@
 // const socket = io.connect('http://localhost:3000');
 // const socket = io.connect('http://192.168.56.1:3000'); // virtualbox ipv4
-const socket = io.connect('http://192.168.1.101:3000'); // wireless ipv4
-
+let socket = io.connect('http://192.168.1.101:3000'); // wireless ipv4
 
 let canvas = document.getElementById('canvas'),
     ctx = canvas.getContext('2d'),
@@ -32,6 +31,7 @@ let players = [];
 let bullets = [];
 let map = undefined;
 let tick = 0;
+let loggedIn = false;
 
 function move() {
     let player = {
@@ -53,8 +53,16 @@ function move() {
         socket.emit('sendPlayerData', player);
 }
 
+const t = 20;
+const colors = {
+    "red": "#f00",
+    "blue": "#00f",
+    "green": "#0f0",
+    "yellow": "#ff0"
+};
+
 function draw() {
-    const t = 20;
+    
 
     ctx.clearRect(0,0,w,h);
     ctx.fillStyle = "#757575";
@@ -64,36 +72,38 @@ function draw() {
     if (map !== undefined) {
         for (let i=0; i<map[0].length; i++) {
             for (let j=0; j<map.length; j++) {
-                if (map[j][i] !== 0)
+                if (map[j][i] !== 0) {
+                    if (map[j][i] === 1)
+                        ctx.fillStyle = "#353535"
+                    else if (map[j][i] === 2)
+                        ctx.fillStyle = "#8B4513"
                     ctx.fillRect(i*t, j*t, t, t);
+                }
             }
         }
     }
     let hp;
 
     players.forEach(player => {
+        ctx.fillStyle = colors[player.color];
+        ctx.fillRect(player.x, player.y, t, t);
         if (player.id == socket.id) {
-            ctx.fillStyle = "#fff";
+            // ctx.strokeStyle = "rgba(255,255,255,0.5)";
+            // ctx.strokeRect(player.x, player.y, t, t);
             hp = player.hp;
         }
-        else
-            ctx.fillStyle = "#4f3";
-
-        ctx.fillRect(player.x, player.y, t, t);
 
         if (player.mouse !== undefined) {
-            
-        let dy = player.mouse.y - player.y-10,
-            dx = player.mouse.x - player.x-10,
-            angle = Math.atan2(dy, dx);
-            
-        ctx.strokeStyle = "#000";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(player.x+10, player.y+10);
-        ctx.lineTo(player.x+10 + Math.cos(angle)*20, player.y+10 + Math.sin(angle)*20);
-        ctx.stroke();
-
+            let dy = player.mouse.y - player.y-10,
+                dx = player.mouse.x - player.x-10,
+                angle = Math.atan2(dy, dx);
+                
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(player.x+10, player.y+10);
+            ctx.lineTo(player.x+10 + Math.cos(angle)*20, player.y+10 + Math.sin(angle)*20);
+            ctx.stroke();
         }
     });
 
@@ -104,17 +114,27 @@ function draw() {
         ctx.fill();
     });
 
+    //info bar
     ctx.font = "14px arial";
     ctx.fillStyle = "#fff";
     ctx.fillText(`${tick}`, 5, 15);
     ctx.fillText(`x:${Key.mouse.x} y:${Key.mouse.y}`, 5, 30);
     ctx.fillText(`HP: ${hp}`, 5, 45);
 
+    //cursor
     ctx.lineWidth = 3;
     ctx.strokeStyle = "#fff";
     ctx.beginPath();
     ctx.arc(Key.mouse.x,Key.mouse.y,5,0,Math.PI*2);
     ctx.stroke();
+
+    if (!loggedIn) {
+        ctx.fillStyle = "rgba(53,53,53,0.6)";
+        ctx.fillRect(0,0,w,h);
+
+        //call function drawing scoreboard
+            //draw names of plazers
+    }
 }
 
 socket.on('emitPlayerData', data => {
@@ -133,11 +153,25 @@ socket.on('tick', data => {
     tick = data.tick;
 })
 
+function loginPlayer() {
+    let name = document.getElementById("playerName").value,
+        color = document.getElementById("color").value;
+    let player = {name: name, color: color};
+
+    let names = players.map(player => player.name);
+    if (names.indexOf(name) !== -1)
+        return;
+
+    loggedIn = true;
+    socket.emit('createPlayer', player);
+    document.getElementById('login').style = "display:none";
+}
+
 function update() {
     draw();
-    move();
+    if (loggedIn)
+        move();
 
     requestAnimationFrame(update);
 }
-
 update();

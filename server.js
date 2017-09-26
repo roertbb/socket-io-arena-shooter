@@ -17,26 +17,32 @@ let map = [
     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,2,2,0,0,0,0,0,0,0,0,1],
     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,0,0,0,0,1,1,1,1,1,1,0,0,0,0,1,1,1],
+    [1,2,2,0,0,0,0,1,1,1,1,1,1,0,0,0,0,2,2,1],
     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
-    [1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1],
+    [1,2,2,2,2,0,0,0,0,0,0,0,0,0,0,2,2,2,2,1],
     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
     [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
 ];
 const t = 20;
 
+const spawningPoints = [{x: 40, y: 120}, {x: 340, y: 120}];
+
 io.on('connection', function(socket) {
     console.log("made socket connection", socket.id);
-    players.push({id: socket.id, hp: 100, x: 150, y: 200, vx: 0, vy: 0, ground: false, delay: 0});
-    playersData.push({id: socket.id, down: []});
 
+    socket.on('createPlayer', player => {
+        let spawningPoint = spawningPoints[Math.floor(Math.random()*spawningPoints.length)];
+        players.push({id: socket.id, name: player.name, color: player.color, hp: 100, x: spawningPoint.x, y: spawningPoint.y, vx: 0, vy: 0, ground: false, delay: 0});
+        playersData.push({id: socket.id, down: []});
+        io.sockets.emit('emitPlayerData', players);
+    })
+    
     socket.emit('sendMap', {map: map});
-    io.sockets.emit('emitPlayerData', players);
 
     socket.on('sendPlayerData', playerData => {
         playersData.forEach(pd => {
@@ -85,12 +91,6 @@ function updatePlayer(playerData) {
     
     if (down === undefined)
         down = [];
-
-    if (player.hp <= 0) {
-        player.x = 150;
-        player.y = 30;
-        player.hp = 100;
-    }
 
     else if (player !== undefined) {
 
@@ -180,13 +180,19 @@ function collTile(x, y) {
     //     return true;
     // else
     //     return false;
-    if (map[Math.floor(y/t)][Math.floor(x/t)] !== 0 || 
-        map[Math.ceil(y/t)][Math.floor(x/t)] !== 0 ||
-        map[Math.floor(y/t)][Math.ceil(x/t)] !== 0 ||
-        map[Math.ceil(y/t)][Math.ceil(x/t)] !== 0) 
+    let left_up = map[Math.floor(y/t)][Math.floor(x/t)],
+        right_up = map[Math.floor(y/t)][Math.ceil(x/t)],
+        left_down = map[Math.ceil(y/t)][Math.floor(x/t)],
+        right_down = map[Math.ceil(y/t)][Math.ceil(x/t)];
+
+    if (left_up !== 0 || 
+        right_up !== 0 ||
+        left_down !== 0 ||
+        right_down !== 0) 
         return true;
-    else 
+    else {
         return false;
+    }
 }
 
 function collBullet(x, y) {
@@ -222,11 +228,15 @@ setInterval( function() {
                     bullets.splice(bullets.indexOf(bullet),1);
                 }    
             }
+            if (player.hp <= 0) {
+                let spawningPoint = spawningPoints[Math.floor(Math.random()*spawningPoints.length)];
+                player.x = spawningPoint.x;
+                player.y = spawningPoint.y;
+                player.hp = 100;
+            }
         });
-        // console.log(bullet);
         if (collBullet(bullet.x, bullet.y))
-            bullets.splice(bullets.indexOf(bullet),1);
-            
+            bullets.splice(bullets.indexOf(bullet),1); 
     });
 
     io.sockets.emit('emitPlayerData', players);
