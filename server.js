@@ -12,6 +12,7 @@ let players = [];
 let playersData = [];
 let bullets = [];
 let stats = [];
+let packages = [];
 
 let map = [
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -38,7 +39,7 @@ io.on('connection', function(socket) {
 
     socket.on('createPlayer', player => {
         let spawningPoint = spawningPoints[Math.floor(Math.random()*spawningPoints.length)];
-        players.push({id: socket.id, name: player.name, color: player.color, hp: 100, x: spawningPoint.x, y: spawningPoint.y, vx: 0, vy: 0, ground: false, delay: 0});
+        players.push({id: socket.id, name: player.name, color: player.color, hp: 100, gun: "default", ammo: -1, x: spawningPoint.x, y: spawningPoint.y, vx: 0, vy: 0, ground: false, delay: 0});
         playersData.push({id: socket.id, down: []});
         stats.push({id: socket.id, name: player.name, k:0, d:0});
         io.sockets.emit('emitPlayerData', players);
@@ -166,7 +167,13 @@ function updatePlayer(playerData) {
         if (mouse.pressed && player.delay <= 0) {
             player.delay = 8;
             let angle = Math.atan2(player.mouse.y - player.y-10, player.mouse.x - player.x-10);
-            bullets.push({id: player.id, x: player.x+10, y: player.y+10, vx: Math.cos(angle)*15, vy: Math.sin(angle)*15});
+            if (player.ammo > 0)
+                player.ammo--;
+            if (player.ammo === 0) {
+                player.gun = "default";
+                player.ammo = -1;
+            }
+            bullets.push({id: player.id, type: player.gun, x: player.x+10, y: player.y+10, vx: Math.cos(angle)*15, vy: Math.sin(angle)*15});
         }
         player.delay--;
     }
@@ -225,6 +232,34 @@ function aabbBullet(player, bullet) {
         return false;
 }
 
+function aabbToAabb(player, package) {
+    if (player.x+t < package.x || package.x+t < player.x ||
+        player.y+t < package.y || package.y+t < player.y)
+        return false;
+    else
+        return true;
+}
+
+function spawnPackage() {
+    const spawnPoints = ["40,180", "340,180", "40,240", "340,240"];
+    const type = ["health", "gun1", "gun2"];
+
+    let alreadySpawned = packages.map(package => {
+        return String(package.x)+","+String(package.y);
+    });
+
+    let availablePoints = spawnPoints.filter(package => {
+        return (alreadySpawned.indexOf(package) === -1)
+    }).map(package => {
+        let cords = package.split(',');
+        return {x: Number(cords[0]), y: Number(cords[1])};
+    });
+    
+    let spawnPoint = availablePoints[Math.floor(Math.random()*availablePoints.length)];
+    
+    packages.push({type: type[Math.floor(Math.random()*type.length)], x: spawnPoint.x, y: spawnPoint.y});    
+}
+
 setInterval( function() {
     let statsChanged = false;
 
@@ -233,6 +268,17 @@ setInterval( function() {
         if (pd === undefined)
             pd = {id: player.id, down: []};
         updatePlayer(pd);
+        packages.forEach(package => {
+            if (aabbToAabb(player,package)) {
+                if (package.type === "health")
+                    player.hp += 20;
+                else {
+                    player.gun = package.type;
+                    player.ammo = 10;
+                }
+                packages.splice(packages.indexOf(package),1);
+            }
+        });
     });
 
     bullets.forEach(bullet => {
@@ -268,10 +314,13 @@ setInterval( function() {
     io.sockets.emit('emitBulletData', bullets);
     if (statsChanged)
         io.sockets.emit('emitStats', stats);
+    io.sockets.emit('emitPackageData', packages);
 }, 30);
 
 let tick = 0;
 setInterval( function() {
     tick++;
     io.sockets.emit('tick', {tick: tick});
+    if (tick % 10 === 0 && packages.length < 4)
+        spawnPackage();
 }, 1000);

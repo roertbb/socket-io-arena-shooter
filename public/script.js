@@ -30,6 +30,7 @@ function getMouseCords(event) {
 let players = [];
 let bullets = [];
 let stats = [];
+let packages = [];
 let map = undefined;
 let tick = 0;
 let loggedIn = false;
@@ -55,17 +56,18 @@ function move() {
 }
 
 const t = 20;
-const colors = {
-    "red": "#f00",
-    "blue": "#00f",
-    "green": "#0f0",
-    "yellow": "#ff0"
+const colors = ["red", "blue", "green", "yellow"];
+const packageType = ["gun1", "gun2", "health"];
+const gunType = ["default", "gun1", "gun2"];
+const bulletType = {
+    "default": "#fff",
+    "gun1": "#832",
+    "gun2": "#3f4"
 };
 
 function draw() {
     let dead = false;
     
-
     ctx.clearRect(0,0,w,h);
     ctx.fillStyle = "#757575";
     ctx.fillRect(0,0,w,h);
@@ -84,36 +86,49 @@ function draw() {
             }
         }
     }
-    let hp;
+    let hp, ammo;
 
     players.forEach(player => {
-        ctx.fillStyle = colors[player.color];
-        ctx.fillRect(player.x, player.y, t, t);
+        // draw hero
+        if (player.mouse !== undefined && player.x+15 < player.mouse.x)
+            ctx.drawImage(imgHero, 0, colors.indexOf(player.color)*t, t, t, player.x, player.y, t, t);
+        else
+            ctx.drawImage(imgHero, t, colors.indexOf(player.color)*t, t, t, player.x, player.y, t, t);
+
         if (player.id == socket.id) {
-            // ctx.strokeStyle = "rgba(255,255,255,0.5)";
-            // ctx.strokeRect(player.x, player.y, t, t);
             hp = player.hp;
+            ammo = player.ammo;
         }
 
+        // draw gun
         if (player.mouse !== undefined) {
             let dy = player.mouse.y - player.y-10,
                 dx = player.mouse.x - player.x-10,
                 angle = Math.atan2(dy, dx);
-                
-            ctx.strokeStyle = "#000";
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(player.x+10, player.y+10);
-            ctx.lineTo(player.x+10 + Math.cos(angle)*20, player.y+10 + Math.sin(angle)*20);
-            ctx.stroke();
+            
+            ctx.translate( player.x+10, player.y+5 );
+            ctx.rotate( angle );
+            if (player.mouse !== undefined && player.x+15 > player.mouse.x)
+                ctx.scale(1,-1);
+            ctx.drawImage( imgGun, gunType.indexOf(player.gun)*t, 0, t, 15, 0, 0, t, 15);
+            if (player.mouse !== undefined && player.x+15 > player.mouse.x)
+                ctx.scale(1,-1);
+            ctx.rotate( -angle );
+            ctx.translate( -player.x-10, -player.y-5 );
         }
     });
 
-    ctx.fillStyle = "#fff";
     bullets.forEach(bullet => {
+        ctx.fillStyle = bulletType[bullet.type];
         ctx.beginPath();
         ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI*2);
         ctx.fill();
+    });
+
+    ctx.fillStyle = "#384";
+    packages.forEach(package => {
+        //ctx.fillRect(package.x, package.y, t, t);
+        ctx.drawImage(imgPackage, packageType.indexOf(package.type)*t, 0 ,t, t, package.x, package.y, t, t);
     });
 
     //info bar
@@ -122,6 +137,7 @@ function draw() {
     ctx.fillText(`${tick}`, 5, 15);
     ctx.fillText(`x:${Key.mouse.x} y:${Key.mouse.y}`, 5, 30);
     ctx.fillText(`HP: ${hp}`, 5, 45);
+    ctx.fillText(`ammo: ${ammo===-1?"unlimited":ammo}`, 5, 60);
 
     //cursor
     ctx.lineWidth = 3;
@@ -176,6 +192,10 @@ socket.on('emitStats', data => {
     stats = data;
 });
 
+socket.on('emitPackageData', data => {
+    packages = data;
+});
+
 socket.on('sendMap', data => {
     map = data.map;
 });
@@ -198,11 +218,22 @@ function loginPlayer() {
     document.getElementById('login').style = "display:none";
 }
 
+let imgHero, imgGun, imgPackage;
+function load() {
+    imgHero = new Image();
+    imgHero.src = "./img/player.png";
+    imgGun = new Image();
+    imgGun.src = "./img/weapon.png";
+    imgPackage = new Image();
+    imgPackage.src = "./img/package.png"
+}
+
 function update() {
     draw();
     if (loggedIn)
-        move();
-
+    move();
+    
     requestAnimationFrame(update);
 }
+load();
 update();
