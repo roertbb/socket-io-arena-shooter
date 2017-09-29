@@ -11,6 +11,7 @@ console.log("Starting server...");
 let players = [];
 let playersData = [];
 let bullets = [];
+let stats = [];
 
 let map = [
     [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
@@ -39,7 +40,9 @@ io.on('connection', function(socket) {
         let spawningPoint = spawningPoints[Math.floor(Math.random()*spawningPoints.length)];
         players.push({id: socket.id, name: player.name, color: player.color, hp: 100, x: spawningPoint.x, y: spawningPoint.y, vx: 0, vy: 0, ground: false, delay: 0});
         playersData.push({id: socket.id, down: []});
+        stats.push({id: socket.id, name: player.name, k:0, d:0});
         io.sockets.emit('emitPlayerData', players);
+        io.sockets.emit('emitStats', stats);
     })
     
     socket.emit('sendMap', {map: map});
@@ -57,6 +60,7 @@ io.on('connection', function(socket) {
 
     socket.on('disconnect', function(){
       players = players.filter(p => p.id !== socket.id);
+      stats = stats.filter(p => p.id !== socket.id);
       io.sockets.emit('emitPlayerData', players);
       console.log("player", socket.id, "disconnected");
     })
@@ -222,6 +226,8 @@ function aabbBullet(player, bullet) {
 }
 
 setInterval( function() {
+    let statsChanged = false;
+
     players.forEach(player => {
         let pd = playersData.filter(pd => pd.id == player.id)[0];
         if (pd === undefined)
@@ -243,6 +249,15 @@ setInterval( function() {
                 player.tick = tick+5;
                 player.x = -20;
                 player.y = -20;
+                stats.forEach(stat => {
+                    if (stat.id === player.id) {
+                        stat.d++;
+                    }
+                    else if (stat.id === bullet.id) {
+                        stat.k++;
+                    }
+                });
+                statsChanged = true;
             }
         });
         if (collBullet(bullet.x, bullet.y))
@@ -251,6 +266,8 @@ setInterval( function() {
 
     io.sockets.emit('emitPlayerData', players.filter(player => player.tick == undefined));
     io.sockets.emit('emitBulletData', bullets);
+    if (statsChanged)
+        io.sockets.emit('emitStats', stats);
 }, 30);
 
 let tick = 0;

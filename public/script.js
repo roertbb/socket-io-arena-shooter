@@ -9,7 +9,7 @@ let canvas = document.getElementById('canvas'),
 
 let Key = {
 	pressed: {},
-	keys: {w: 87, s: 83, a: 65, d: 68},
+	keys: {w: 87, s: 83, a: 65, d: 68, t: 84},
 	isDown: function (keyCode) { return this.pressed[this.keys[keyCode]]; },
 	onKeyDown: function (event) { this.pressed[event.keyCode] = true; },
     onKeyUp: function (event) { delete this.pressed[event.keyCode]; },
@@ -29,6 +29,7 @@ function getMouseCords(event) {
 
 let players = [];
 let bullets = [];
+let stats = [];
 let map = undefined;
 let tick = 0;
 let loggedIn = false;
@@ -146,6 +147,21 @@ function draw() {
             ctx.fillText("please customize and hit play button!",w/2-120,h/2);
         }
     }
+
+    if (Key.isDown('t')) {
+        ctx.fillStyle = "rgba(53,53,53,0.6)";
+        ctx.fillRect(0,0,w,h);
+
+        ctx.fillStyle = "#fff";
+        let y = 0;
+        ctx.fillText(`kills       deaths`,150,30);
+        stats.forEach(stat => {
+            ctx.fillText(`${stat.name}`,50,50+y);
+            ctx.fillText(`${stat.k}`,150,50+y);
+            ctx.fillText(`${stat.d}`,200,50+y);
+            y+=20;
+        });
+    }
 }
 
 socket.on('emitPlayerData', data => {
@@ -154,6 +170,10 @@ socket.on('emitPlayerData', data => {
 
 socket.on('emitBulletData', data => {
     bullets = data;
+});
+
+socket.on('emitStats', data => {
+    stats = data;
 });
 
 socket.on('sendMap', data => {
