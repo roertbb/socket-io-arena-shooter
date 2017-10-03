@@ -1,77 +1,101 @@
 // const socket = io.connect('http://localhost:3000');
-// const socket = io.connect('http://192.168.56.1:3000'); // virtualbox ipv4
-let socket = io.connect('http://192.168.1.101:3000'); // wireless ipv4
+// let socket = io.connect('http://192.168.1.101:3000'); // wireless ipv4
+let socket = io.connect('http://192.168.0.15:3000');
 
 let canvas = document.getElementById('canvas'),
     ctx = canvas.getContext('2d'),
     w = canvas.width =  400;
     h = canvas.height = 280;
 
-let Key = {
+let Input = {
 	pressed: {},
 	keys: {w: 87, s: 83, a: 65, d: 68, t: 84},
+    mouse: {x: 0, y: 0, pressed: false},
 	isDown: function (keyCode) { return this.pressed[this.keys[keyCode]]; },
 	onKeyDown: function (event) { this.pressed[event.keyCode] = true; },
-    onKeyUp: function (event) { delete this.pressed[event.keyCode]; },
-    mouse: {x: 0, y: 0, pressed: false, delay: 0}
+    onKeyUp: function (event) { delete this.pressed[event.keyCode]; }
 };
-window.addEventListener('keyup', (event) => { Key.onKeyUp(event); }, false);
-window.addEventListener('keydown', (event) => { Key.onKeyDown(event); }, false);
+window.addEventListener('keyup', (event) => { Input.onKeyUp(event); }, false);
+window.addEventListener('keydown', (event) => { Input.onKeyDown(event); }, false);
 window.addEventListener('mousemove', (event) => { getMouseCords(event); }, false);
-window.addEventListener('mousedown', (event) => { Key.mouse.pressed = true; });
-window.addEventListener('mouseup', (event) => { Key.mouse.pressed = false; });
+window.addEventListener('mousedown', (event) => { Input.mouse.pressed = true; });
+window.addEventListener('mouseup', (event) => { Input.mouse.pressed = false; });
 
 function getMouseCords(event) {
     let rect = canvas.getBoundingClientRect();
-    Key.mouse.x = event.clientX-rect.left;
-    Key.mouse.y = event.clientY-rect.top;
+    Input.mouse.x = event.clientX-rect.left;
+    Input.mouse.y = event.clientY-rect.top;
 }
-
-let players = [];
-let bullets = [];
-let stats = [];
-let packages = [];
-let map = undefined;
-let tick = 0;
-let loggedIn = false;
-
-function move() {
-    let player = {
-        id: socket.id,
-        down: [],
-        mouse: {x: Key.mouse.x, y: Key.mouse.y, pressed: Key.mouse.pressed, delay: Key.mouse.delay}
+// consts
+const t = 20,
+    colors = ["red", "blue", "green", "yellow"],
+    packageType = ["gun1", "gun2", "health"],
+    gunType = ["default", "gun1", "gun2"],
+    bulletType = {
+        "default": "#fff",
+        "gun1": "#832",
+        "gun2": "#3f4"
     };
 
-    if (Key.isDown('w'))
-        player.down.push('w');
-    else if (Key.isDown('s'))
-        player.down.push('s');
-    if (Key.isDown('a'))
-        player.down.push('a');
-    else if (Key.isDown('d'))
-        player.down.push('d');
+// data
+let players = [],
+    bullets = [],
+    stats = [],
+    packages = [],
+    map = undefined,
+    time = 0,
+    loggedIn = false;
 
-    // if (player.down.length !== 0)
-        socket.emit('sendPlayerData', player);
+// reacting on socket
+socket.on('serverData', data => {
+    if (data.players !== undefined)
+        players = data.players;
+    if (data.bullets !== undefined)
+        bullets = data.bullets;
+    if (data.stats !== undefined)
+        stats = data.stats;
+    if (data.packages !== undefined)
+        packages = data.packages;
+});
+
+socket.on('time', data => {
+    time = data.time;
+});
+
+socket.on('sendMap', data => {
+    map = data.map;
+});
+
+// front functions
+function getInput() {
+    let playerData = {
+        id: socket.id,
+        down: [],
+        mouse: {
+            x: Input.mouse.x,
+            y: Input.mouse.y,
+            pressed: Input.mouse.pressed
+        }
+    };
+
+    if (Input.isDown('w'))
+        playerData.down.push('w');
+    else if (Input.isDown('s'))
+        playerData.down.push('s');
+    if (Input.isDown('a'))
+        playerData.down.push('a');
+    else if (Input.isDown('d'))
+        playerData.down.push('d');
+
+    socket.emit('clientData', playerData);
 }
 
-const t = 20;
-const colors = ["red", "blue", "green", "yellow"];
-const packageType = ["gun1", "gun2", "health"];
-const gunType = ["default", "gun1", "gun2"];
-const bulletType = {
-    "default": "#fff",
-    "gun1": "#832",
-    "gun2": "#3f4"
-};
-
 function draw() {
-    let dead = false;
-    
     ctx.clearRect(0,0,w,h);
     ctx.fillStyle = "#757575";
     ctx.fillRect(0,0,w,h);
 
+    // drawing map
     ctx.fillStyle = "#353535";
     if (map !== undefined) {
         for (let i=0; i<map[0].length; i++) {
@@ -86,6 +110,8 @@ function draw() {
             }
         }
     }
+
+    // drawing objects
     let hp, ammo;
 
     players.forEach(player => {
@@ -105,68 +131,38 @@ function draw() {
             let dy = player.mouse.y - player.y-10,
                 dx = player.mouse.x - player.x-10,
                 angle = Math.atan2(dy, dx);
-            
-            ctx.translate( player.x+10, player.y+5 );
-            ctx.rotate( angle );
-            if (player.mouse !== undefined && player.x+15 > player.mouse.x)
-                ctx.scale(1,-1);
-            ctx.drawImage( imgGun, gunType.indexOf(player.gun)*t, 0, t, 15, 0, 0, t, 15);
-            if (player.mouse !== undefined && player.x+15 > player.mouse.x)
-                ctx.scale(1,-1);
-            ctx.rotate( -angle );
-            ctx.translate( -player.x-10, -player.y-5 );
+            drawRotatedImage(ctx, imgGun, angle%(Math.PI*2), player.x+10, player.y+5, gunType.indexOf(player.gun)*t, 0, t, 15);
         }
     });
 
     bullets.forEach(bullet => {
-        ctx.fillStyle = bulletType[bullet.type];
-        ctx.beginPath();
-        ctx.arc(bullet.x, bullet.y, 5, 0, Math.PI*2);
-        ctx.fill();
-    });
+        let angle = Math.atan2(bullet.vy, bullet.vx);
+        drawRotatedImage(ctx, imgBullet, angle%(Math.PI*2), bullet.x-5, bullet.y-5, gunType.indexOf(bullet.type)*10, 0, 10, 10);
+    }) 
 
-    ctx.fillStyle = "#384";
     packages.forEach(package => {
-        //ctx.fillRect(package.x, package.y, t, t);
         ctx.drawImage(imgPackage, packageType.indexOf(package.type)*t, 0 ,t, t, package.x, package.y, t, t);
     });
 
     //info bar
     ctx.font = "14px arial";
     ctx.fillStyle = "#fff";
-    ctx.fillText(`${tick}`, 5, 15);
-    ctx.fillText(`x:${Key.mouse.x} y:${Key.mouse.y}`, 5, 30);
-    ctx.fillText(`HP: ${hp}`, 5, 45);
-    ctx.fillText(`ammo: ${ammo===-1?"unlimited":ammo}`, 5, 60);
+    ctx.fillText(`${time}`, 5, 15);
+    ctx.fillText(`HP: ${hp}`, 5, 30);
+    ctx.fillText(`ammo: ${ammo===-1?"unlimited":ammo}`, 5, 45);
 
     //cursor
     ctx.lineWidth = 3;
     ctx.strokeStyle = "#fff";
     ctx.beginPath();
-    ctx.arc(Key.mouse.x,Key.mouse.y,5,0,Math.PI*2);
+    ctx.arc(Input.mouse.x,Input.mouse.y,5,0,Math.PI*2);
     ctx.stroke();
 
-    let playersIDs = players.map(player => player.id);
+    let isFaded = false;
 
-    if (playersIDs.indexOf(socket.id) === -1) {
-        ctx.fillStyle = "rgba(53,53,53,0.6)";
-        ctx.fillRect(0,0,w,h);
-
-        ctx.fillStyle = "#fff";
-        if (loggedIn) {
-            // draw.proper.fill
-            ctx.fillText("You died!",w/2-40,h/2);
-            ctx.fillText(`respawning in 5 seconds`,w/2-80,h/2+20);
-        }
-        else {
-            // must have died
-            ctx.fillText("please customize and hit play button!",w/2-120,h/2);
-        }
-    }
-
-    if (Key.isDown('t')) {
-        ctx.fillStyle = "rgba(53,53,53,0.6)";
-        ctx.fillRect(0,0,w,h);
+    if (Input.isDown('t')) {
+        fade();
+        isFaded = true;
 
         ctx.fillStyle = "#fff";
         let y = 0;
@@ -178,31 +174,39 @@ function draw() {
             y+=20;
         });
     }
+
+    let playersIDs = players.map(player => player.id);
+    if (playersIDs.indexOf(socket.id) === -1 && !isFaded) {
+        fade();
+
+        ctx.fillStyle = "#fff";
+        if (loggedIn) {
+            ctx.fillText('You died!',w/2-40,h/2);
+            ctx.fillText(`respawning in 5 seconds`,w/2-80,h/2+20);
+        }
+        else {
+            ctx.fillText("please customize and hit play button!",w/2-120,h/2);
+        }
+    }
+    
+    // drawing functions
+    function fade() {
+        ctx.fillStyle = "rgba(53,53,53,0.6)";
+        ctx.fillRect(0,0,w,h);
+    }
+
+    function drawRotatedImage(context, image, angle, x, y, imageX, imageY, width, height) {
+        context.translate(x, y);
+        context.rotate(angle);
+        if (angle > Math.PI/2 || angle < -Math.PI/2)
+            context.scale(1, -1);
+        context.drawImage(image, imageX, imageY, width, height, 0, 0, width, height);
+        if (angle > Math.PI/2 || angle < -Math.PI/2)
+            context.scale(1, -1);
+        context.rotate(-angle);
+        context.translate(-x, -y);
+    }
 }
-
-socket.on('emitPlayerData', data => {
-    players = data;
-});
-
-socket.on('emitBulletData', data => {
-    bullets = data;
-});
-
-socket.on('emitStats', data => {
-    stats = data;
-});
-
-socket.on('emitPackageData', data => {
-    packages = data;
-});
-
-socket.on('sendMap', data => {
-    map = data.map;
-});
-
-socket.on('tick', data => {
-    tick = data.tick;
-})
 
 function loginPlayer() {
     let name = document.getElementById("playerName").value,
@@ -218,22 +222,25 @@ function loginPlayer() {
     document.getElementById('login').style = "display:none";
 }
 
-let imgHero, imgGun, imgPackage;
-function load() {
+let imgHero, imgGun, imgPackage, imgBullet;
+function loadImages() {
     imgHero = new Image();
     imgHero.src = "./img/player.png";
     imgGun = new Image();
     imgGun.src = "./img/weapon.png";
     imgPackage = new Image();
     imgPackage.src = "./img/package.png"
+    imgBullet = new Image();
+    imgBullet.src = "./img/bullets.png"
 }
 
 function update() {
     draw();
     if (loggedIn)
-    move();
+        getInput();
     
     requestAnimationFrame(update);
 }
-load();
+loadImages();
 update();
+
