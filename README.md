@@ -1,6 +1,4 @@
-# game-title-io
-
-Driven by unstoppable desire to mess around with socket.io I've created such a fancy... thing
+multiplayer platform shooter game made using socket.io
 
 ## Usage
 Clone repo and
