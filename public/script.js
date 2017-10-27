@@ -1,6 +1,4 @@
-// const socket = io.connect('http://localhost:3000');
-// let socket = io.connect('http://192.168.1.101:3000'); // wireless ipv4
-let socket = io.connect('http://192.168.0.15:3000');
+const socket = io.connect('http://localhost:3000');
 
 let canvas = document.getElementById('canvas'),
     ctx = canvas.getContext('2d'),
@@ -92,7 +90,9 @@ function getInput() {
 
 function draw() {
     ctx.clearRect(0,0,w,h);
-    ctx.fillStyle = "#757575";
+    // ctx.fillStyle = "#757575";
+    // ctx.fillStyle = "#80C9C1";
+    ctx.fillStyle = "#222034";
     ctx.fillRect(0,0,w,h);
 
     // drawing map
@@ -101,11 +101,7 @@ function draw() {
         for (let i=0; i<map[0].length; i++) {
             for (let j=0; j<map.length; j++) {
                 if (map[j][i] !== 0) {
-                    if (map[j][i] === 1)
-                        ctx.fillStyle = "#353535"
-                    else if (map[j][i] === 2)
-                        ctx.fillStyle = "#8B4513"
-                    ctx.fillRect(i*t, j*t, t, t);
+                    ctx.drawImage(imgTiles, (map[j][i]-1)*t, 0, t, t, i*t, j*t, t, t);
                 }
             }
         }
@@ -115,11 +111,18 @@ function draw() {
     let hp, ammo;
 
     players.forEach(player => {
-        // draw hero
-        if (player.mouse !== undefined && player.x+15 < player.mouse.x)
-            ctx.drawImage(imgHero, 0, colors.indexOf(player.color)*t, t, t, player.x, player.y, t, t);
-        else
-            ctx.drawImage(imgHero, t, colors.indexOf(player.color)*t, t, t, player.x, player.y, t, t);
+        // function drawFlippedImage(context, image, turned, x, y, imageX, imageY, width, height)
+        // imageX ~ frame
+
+        if (player.sprite.frame === -1) {
+            drawFlippedImage(ctx, imgHero, player.sprite.turned, player.x, player.y, 2*t, colors.indexOf(player.color)*t, t, t);
+        }
+        else if (player.sprite.frame === 0) {
+            drawFlippedImage(ctx, imgHero, player.sprite.turned, player.x, player.y, 0, colors.indexOf(player.color)*t, t, t);
+        }
+        else {
+            drawFlippedImage(ctx, imgHero, player.sprite.turned, player.x, player.y, player.sprite.frame*t, colors.indexOf(player.color)*t, t, t);
+        }
 
         if (player.id == socket.id) {
             hp = player.hp;
@@ -166,11 +169,18 @@ function draw() {
 
         ctx.fillStyle = "#fff";
         let y = 0;
-        ctx.fillText(`kills       deaths`,150,30);
-        stats.forEach(stat => {
+        ctx.fillText(`kills       deaths`,200,30);
+        let statsToCompare = stats.map(k => k).sort(compareKD);
+
+        statsToCompare.forEach(stat => {
+            if (stat.id == socket.id) {
+                ctx.fillStyle = "rgba(155,155,155,0.6)";
+                ctx.fillRect(45, 35+y,250,22);
+                ctx.fillStyle = "#fff";
+            }
             ctx.fillText(`${stat.name}`,50,50+y);
-            ctx.fillText(`${stat.k}`,150,50+y);
-            ctx.fillText(`${stat.d}`,200,50+y);
+            ctx.fillText(`${stat.k}`,200,50+y);
+            ctx.fillText(`${stat.d}`,250,50+y);
             y+=20;
         });
     }
@@ -189,7 +199,14 @@ function draw() {
         }
     }
     
-    // drawing functions
+    // functions
+    function compareKD(a, b) {
+        if (a.k <= b.k)
+            return 1;
+        else
+            return -1;
+    }
+
     function fade() {
         ctx.fillStyle = "rgba(53,53,53,0.6)";
         ctx.fillRect(0,0,w,h);
@@ -204,6 +221,16 @@ function draw() {
         if (angle > Math.PI/2 || angle < -Math.PI/2)
             context.scale(1, -1);
         context.rotate(-angle);
+        context.translate(-x, -y);
+    }
+
+    function drawFlippedImage(context, image, turned, x, y, imageX, imageY, width, height) {
+        context.translate(x,y);
+        if (turned === "left")
+            context.scale(-1, 1);
+        context.drawImage(image, imageX, imageY, width, height, turned==="left"?-20:0, 0, width, height);
+        if (turned === "left")
+            context.scale(-1, 1);
         context.translate(-x, -y);
     }
 }
@@ -222,7 +249,7 @@ function loginPlayer() {
     document.getElementById('login').style = "display:none";
 }
 
-let imgHero, imgGun, imgPackage, imgBullet;
+let imgHero, imgGun, imgPackage, imgBullet, imgTiles;
 function loadImages() {
     imgHero = new Image();
     imgHero.src = "./img/player.png";
@@ -232,6 +259,8 @@ function loadImages() {
     imgPackage.src = "./img/package.png"
     imgBullet = new Image();
     imgBullet.src = "./img/bullets.png"
+    imgTiles = new Image();
+    imgTiles.src = "./img/tiles.png";
 }
 
 function update() {
