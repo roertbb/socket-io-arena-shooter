@@ -19,6 +19,7 @@ w-s-a-d - moving
 aiming - mouse
 shooting - lmb
 t - stats
+```
 
 ### Inspired by [rxi's tinyarena](https://rxi.itch.io/tinyarena)
 
